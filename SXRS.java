@@ -25,21 +25,22 @@ import java.util.*;
 public class SXRS extends Applet
     implements WindowListener, ActionListener {
 
-    public static final String version="2.003";
+    public static final String version="3.000";
 
     TextField tf_userId;                 // default user ID to use
     JCheckBox ckb_viewonly;              // view only flag for vncviewer
     TextField tf_loginChain;		 // user@host opts ! user@host opts...
-    JComboBox cb_vncserverHostDisplay;	 // e.g. goose01:5901
-    TextField tf_localVncPort;		 // port on localhost for VNC tunnel
+    JComboBox cb_vncserverHostDisplays;	 // e.g. vncsrv01:1 vncsrv02:1
+    TextField tf_localVncPortStart;	 // port on localhost for VNC tunnel
     TextField tf_localLoginPortStart;	 // port on localhost for ssh tunnel
     JComboBox cb_xtermCommandName;	 // terminal command name
     JComboBox cb_vncviewerCommandName;	 // vncviewer command name
     Button b_advancedSettingsToggle;	 // show/hide advanced settings
     Box    pnl_advancedSettings;	 // the advanced settings panel
     Box    pnl_startTerminalButtons;	 // the panel of "start ssh #n" buttons
+    Box    pnl_startViewerButtons;	 // the panel of "start vnc #n" buttons
     Button[] ba_startTerminal;		 // the "start ssh #n" buttons
-    Button b_startViewer;		 // the "start vncviewer" button
+    Button[] ba_startViewer;		 // the "start vnc #n" buttons
     Button b_help;			 // the help button
     JFrame helpFrame;                    // the help window
 
@@ -58,7 +59,10 @@ public class SXRS extends Applet
     String os;		              // operating system
     String tmpdir;	              // directory for temporary files
     ClassLoader classLoader;          // global class loader to use
-    int localVncPort=5909;            // value of vnc port opened on last login
+    int n_vncserverHostDisplays=0;    // number of vnc servers for login
+    String[] vncserverHosts;          // individual vnc hosts
+    int[] vncserverDisplays;          // individual vnc display numbers
+    int localVncPortStart=5909;       // value of vnc port opened on last login
     // note that localVncPort should reflect the value in effect when the last
     // login terminal was opened, so startViewer() uses the right one even
     // if user changes the port after opening last login terminal.
@@ -144,25 +148,25 @@ public class SXRS extends Applet
 	      ( "sxrs.loginChain", "( loginChain not set )" ), 30);
 	pnl_advancedSettings.add( makeInputPanel("Login chain:", tf_loginChain));
 
-	// vncserverHostDisplay
-	cb_vncserverHostDisplay= new JComboBox( );
-	String default_vncserver= getSystemProperty("sxrs.vncserverHostDisplay","( vncserver not set )");
-	cb_vncserverHostDisplay.addItem(default_vncserver);
+	// vncserverHostDisplays
+	cb_vncserverHostDisplays= new JComboBox( );
+	String default_vncservers= getSystemProperty("sxrs.vncserverHostDisplay","");
+	cb_vncserverHostDisplays.addItem(default_vncservers);
 	for (int i=1; i<100; i++) {
 	    String alt= getSystemProperty("sxrs.vncserverHostDisplay_"+i,"");
 	    if (alt.length()<=0)
 		break;
-	    cb_vncserverHostDisplay.addItem( alt );
+	    cb_vncserverHostDisplays.addItem( alt );
 	}
-	cb_vncserverHostDisplay.setSelectedItem(default_vncserver);
-	cb_vncserverHostDisplay.setEditable(true);
-	pnl_advancedSettings.add( makeInputPanel("VNC server host:display:",
-						 cb_vncserverHostDisplay));
+	cb_vncserverHostDisplays.setSelectedItem(default_vncservers);
+	cb_vncserverHostDisplays.setEditable(true);
+	pnl_advancedSettings.add( makeInputPanel("VNC server host:display [...]:",
+						 cb_vncserverHostDisplays));
 
 	// localVncPort
-	tf_localVncPort= new TextField( getSystemProperty("sxrs.localVncPort","5909") );
+	tf_localVncPortStart= new TextField( getSystemProperty("sxrs.localVncPort","5909") );
 	pnl_advancedSettings.add( makeInputPanel("Local VNC port:",
-						 tf_localVncPort));
+						 tf_localVncPortStart));
 	
 	// localLoginPortStart
 	tf_localLoginPortStart= new TextField( getSystemProperty("sxrs.localLoginPortStart","10022") );
@@ -218,9 +222,9 @@ public class SXRS extends Applet
 	f2.add(pnl_startTerminalButtons);
 	updateFromLoginChain();
 	// start vnc button
-	b_startViewer= new Button("Start vncviewer");
-	b_startViewer.setEnabled(false);
-	f2.add(b_startViewer);
+	pnl_startViewerButtons= new Box(BoxLayout.X_AXIS);
+	f2.add(pnl_startViewerButtons);
+	updateFromVncserverHostDisplays();
 	// help button
 	b_help= new Button("Help!");
 	f2.add(b_help);
@@ -243,7 +247,6 @@ public class SXRS extends Applet
 	helpFrame.setSize(500,250);
 
 	// attach ActionListeners
-	b_startViewer.addActionListener(this);
 	tf_loginChain.addActionListener(this);
 	tf_userId.addActionListener(this);
 	b_help.addActionListener(this);
@@ -357,6 +360,60 @@ public class SXRS extends Applet
 	}
     }
 
+    void updateFromVncserverHostDisplays()
+    {
+     	// get and validate vncserverHost and vncserverPort list,
+	// update button panel
+	String hds =((String)(cb_vncserverHostDisplays.getSelectedItem())).trim();
+	int ihash= hds.indexOf("#");
+	if (ihash > 0)
+	    hds= hds.substring(0,ihash).trim();  // ignore comment
+	StringTokenizer tk= new StringTokenizer(hds);
+	int n= tk.countTokens();
+	// [re]initialize arrays iff size changes (otherwise re-use)
+	if (n != n_vncserverHostDisplays) {
+	    n_vncserverHostDisplays= n;
+	    vncserverHosts= new String[n];
+	    vncserverDisplays= new int[n];
+	    ba_startViewer= new Button[n];
+	    pnl_startViewerButtons.removeAll();
+	    for (int i=0; i<n; i++) {
+		ba_startViewer[i]= new Button("VNC #"+(i+1));
+		ba_startViewer[i].setEnabled(false);
+		ba_startViewer[i].addActionListener(this);
+		pnl_startViewerButtons.add(ba_startViewer[i]);
+	    }
+	    this.validate();
+	}
+	int i= 0;
+	for (i=0; tk.hasMoreTokens() && i<n; i++) {
+	    String hd= tk.nextToken();
+	    String vncserverHost;
+	    int vncserverDisplay= 1;
+	    try {
+		int icolon= hd.indexOf(":");
+		if (icolon<0) {
+		    vncserverHost= hd;
+		}
+		else {
+		    vncserverHost= hd.substring(0,icolon);
+		    vncserverDisplay= Integer.decode(hd.substring(icolon+1)).intValue();
+		}
+		vncserverHosts[i]= vncserverHost;
+		vncserverDisplays[i]= vncserverDisplay;
+	    }
+	    catch (Exception e) {
+		JOptionPane.showMessageDialog
+		    ( this,
+		      "Could not parse integer from vncserver Host:Display.\n"
+		      +e,
+		      "Error",
+		      JOptionPane.ERROR_MESSAGE );
+		return;
+	    }
+	}
+    }
+
     ////////////////////////////////////////////////////////////////
     // utility methods
 
@@ -386,6 +443,7 @@ public class SXRS extends Applet
 		// make sure buttons are up to date, hopefully not belatedly
 		// (only a problem if the button user is hitting disappeared)
 		updateFromLoginChain();
+		updateFromVncserverHostDisplays();
 		if (ih >= n_loginHosts) {
 		    JOptionPane.showMessageDialog
 			( this,
@@ -399,22 +457,30 @@ public class SXRS extends Applet
 		return;
 	    }
 	}
+	for (int id=0; id<n_vncserverHostDisplays; id++) {
+	    if (source == ba_startViewer[id]) {
+		try {
+		    startViewer(id);
+		} catch (Exception e) {
+		    JOptionPane.showMessageDialog
+			( this,
+			  "While trying to start vncviewer:\n"+e,
+			  "Start vncviewer failure",
+			  JOptionPane.ERROR_MESSAGE );		
+		}
+		return;
+	    }
+	}
 	if (source == tf_userId) {
 	    validateUserId();
 	}
 	else if (source == tf_loginChain) {
 	    updateFromLoginChain();
+	    updateFromVncserverHostDisplays();
 	}
-	else if (source == b_startViewer) {
-	    try {
-		startViewer();
-	    } catch (Exception e) {
-		JOptionPane.showMessageDialog
-		    ( this,
-		      "While trying to start vncviewer:\n"+e,
-		      "Start vncviewer failure",
-		      JOptionPane.ERROR_MESSAGE );		
-	    }
+	else if (source == cb_vncserverHostDisplays) {
+	    updateFromLoginChain();
+	    updateFromVncserverHostDisplays();
 	}
 	else if (source == b_help) {
 	    helpFrame.setVisible(true);
@@ -431,6 +497,8 @@ public class SXRS extends Applet
 		pnl_advancedSettings.setVisible(true);
 		b_advancedSettingsToggle.setLabel("Hide advanced settings");
 	    }
+	    updateFromLoginChain();
+	    updateFromVncserverHostDisplays();
 	    this.validate();
 	    p.setSize( p.getPreferredSize() );
 	    p.validate();
@@ -539,40 +607,11 @@ public class SXRS extends Applet
      	    return;
      	}
 	loginPorts[istage]= nextLoginPort;
-
-     	// get and validate vncserverHost and vncserverPort
-	// strictly only needed for last login, but check each time anyway
-     	String vncserverHost;
-     	int vncserverDisplay= 1;
-     	try {
-	    String hd= ((String)(cb_vncserverHostDisplay.getSelectedItem())).trim();
-	    int ispace= hd.indexOf(" ");
-	    if (ispace > 0)
-		hd= hd.substring(0, ispace); // strip "comments"
-     	    int icolon= hd.indexOf(":");
-     	    if (icolon<0) {
-     		vncserverHost= hd;
-     	    }
-     	    else {
-     		vncserverHost= hd.substring(0,icolon);
-     		vncserverDisplay= Integer.decode(hd.substring(icolon+1)).intValue();
-     	    }
-     	}
-     	catch (Exception e) {
-     	    JOptionPane.showMessageDialog
-     		( appf,
-     		  "Could not parse integer from vncserver Host:Display.\n"
-     		  +e,
-     		  "Error",
-     		  JOptionPane.ERROR_MESSAGE );
-     	    return;
-     	}
-     
      
      	// get and check localVncPort
 	// strictly only needed for last login, but check each time anyway
      	try {
-     	    localVncPort= Integer.decode(tf_localVncPort.getText()).intValue();
+     	    localVncPortStart= Integer.decode(tf_localVncPortStart.getText()).intValue();
      	}
      	catch (Exception e) {
      	    JOptionPane.showMessageDialog
@@ -592,13 +631,23 @@ public class SXRS extends Applet
 	    nexthost= null;
 
 	// set options
-	String options= loginOptions[istage]
-	    + " -l " + loginUsers[istage]
-	    + (nexthost == null ?
-	       ( " -L " + localVncPort + ":" + vncserverHost + ":"
-		 + (vncserverDisplay+5900) + " " ) :
-	       ( " -L " + nextLoginPort + ":" + nexthost + ":22 " ) );
-
+	String options;
+	{
+	    StringBuffer optionbuff= new StringBuffer();
+	    optionbuff.append( loginOptions[istage]
+			       + " -l " + loginUsers[istage] );
+	    if (nexthost != null)
+		optionbuff.append(" -L " + nextLoginPort + ":" + nexthost + ":22 ");
+	    else {
+		for (int id=0; id<n_vncserverHostDisplays; id++)
+		    optionbuff.append
+			( " -L " + (localVncPortStart+id) + ":"
+			  + vncserverHosts[id] + ":"
+			  + (vncserverDisplays[id]+5900) + " " );
+	    }
+	    options= optionbuff.toString();
+	}
+	
      	// get other settings
      	String xtermCommandName= (String)(cb_xtermCommandName.getSelectedItem());
 
@@ -660,8 +709,11 @@ public class SXRS extends Applet
      	// if successful, enable the "startViewer" button
 	if (istage < n_loginHosts-1)
 	    ba_startTerminal[istage+1].setEnabled(true);
-	else
-	    b_startViewer.setEnabled(true);
+	else {
+	    for (int i=0; i<n_vncserverHostDisplays; i++)
+		if (ba_startViewer[i] != null)
+		    ba_startViewer[i].setEnabled(true);
+	}
      
      	// temporary...
      	//System.out.println("Created terminal process "+p+ "\nOs: "+os);
@@ -717,9 +769,10 @@ public class SXRS extends Applet
 
     ////////////////////////////////////////////////////////////////
     // startViewer() method
-    void startViewer() throws Exception
+    void startViewer(int id) throws Exception
     {
 	// build and execute vncviewer command
+	int localVncPort= localVncPortStart + id;
 	String vncviewerCommandName= (String)cb_vncviewerCommandName.getSelectedItem();
 	String exename= vncviewerCommandName;
 	if ( vncviewerCommandName.equals(MANUAL_VNCVIEWER_PLEASE) ) {
