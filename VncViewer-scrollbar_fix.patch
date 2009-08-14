@@ -1,0 +1,12 @@
+*** VncViewer.java~	Thu Apr 26 21:36:00 2007
+--- VncViewer.java	Fri Jul 20 13:35:46 2007
+***************
+*** 192,197 ****
+--- 192,198 ----
+  	vncFrame.setTitle(rfb.desktopName);
+  	vncFrame.pack();
+  	vc.resizeDesktopFrame();
++ 	vncFrame.validate();
+  
+        } else {
+  

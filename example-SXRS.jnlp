@@ -1,0 +1,27 @@
+<jnlp spec="1.0+"
+ codebase="file:///c:/cygwin/home/gahs/KamLAND/KamDAQ/SXRS"
+>
+<information>
+  <title>KamLAND Remote Shift tool</title>
+  <vendor>GAHS</vendor>
+  <homepage href="http://neutrino.phys.ksu.edu/~gahs/SXRS" />
+  <description>A tool to start KamLAND remote shift tools</description>
+</information>
+<offline-allowed/>
+<security>
+  <all-permissions/>
+</security>
+<resources>
+  <j2se version="1.5+" />
+  <jar href="SXRS.jar"/>
+<!-- Uncomment and edit the following "property" lines as needed. -->
+<!--  <property name="sxrs.loginHost" value="ernie.awa.tohoku.ac.jp"/> -->
+<!--  <property name="sxrs.secondLogin" value="shift@telly"/> -->
+<!--  <property name="sxrs.vncserverHostDisplay" value="goose03:2"/> -->
+</resources>
+<resources os="Windows" arch="x86">
+  <jar href="SXRS_winexe.jar"/>
+</resources>
+<application-desc main-class="SXRS">
+</application-desc>
+</jnlp>

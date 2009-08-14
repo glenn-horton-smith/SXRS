@@ -1,0 +1,7 @@
+SXRS: Secure eXperiment Remote Shift tool(s)
+by Glenn Horton-Smith
+
+This directory contains the source code and other files for making the tool(s)
+that let "shifters" make the ssh and vnc connections they need to do
+shifts remotely.
+

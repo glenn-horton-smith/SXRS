@@ -1,0 +1,73 @@
+<HTML>
+<H1>Help for Secure eXperiment Remote Shift connection helper</H1>
+
+This tool will log you into a computer visible from your local
+computer, and then optionally log through from there into computers
+that may be visible only from the first login computer, e.g.,
+computers on a local net behind an NAT or firewall.  At the same time,
+it will configure ssh tunnels which allow you to connect to vncservers
+on the remote network.  You may use this to connect to graphical user
+interfaces on computers used for running a data acquisition system for
+a scientific experiment.
+
+<H3>What to do:</H3>
+
+Normally, all you need to do is make sure the first input field shows
+your correct userid on the remote machine, then press the <INPUT
+TYPE=SUBMIT VALUE="SSH #n"> buttons in sequence.  An external terminal
+program will be launched (either xterm or putty by default).  If no
+terminal appears, see the <A HREF=#Trouble>Trouble Shooting</A>
+section below.  You enter passwords to log into your account, and
+then (if your experiment requires it) into the appropriate accounts on
+one or more computers visible from the first.
+
+<P><I>After</I> you have successfully logged in to the final host, you
+can press the <INPUT TYPE=SUBMIT VALUE="Start vncviewer"> button.
+Enter the vncviewer password when prompted.  If the vncviewer client
+doesn't start or produces an error, see the <A HREF=#Trouble>Trouble
+Shooting</A> section.
+
+<H3>Is there a way to get a ViewOnly VNC session?</H3>
+
+Yes: check the ``VNC "view only mode"'' checkbox.
+
+
+<H3><A NAME="Trouble">Trouble Shooting</A></H3>
+
+<DL>
+ <DT> Terminal doesn't start: 
+    <DD><DL><DT>xterm+ssh: <DD>Are xterm and ssh on your default path?
+          <DT>putty:
+	     <DD><DL><DT>Running from Java web start on a Windows computer?
+	             <DD>Contact a Windows-sympathetic person.
+		     <DT>Running putty on a non-Windows computer or in
+  non-standard way?  <DD>That's weird.  Don't do that.
+                 </DL>
+	</DL>
+
+ <DT> Terminal starts but you can't log in:
+      <DD> Resolve in the same way you would resolve any shell
+login problem.  (E.g., e-mail the sysadmin if you've forgotten a
+password.)
+
+ <DT> vncserver won't start:
+             <DD><DL>
+	         <DT>Quick fix:
+		     <DD>Start vncviewer manually, connecting to "localhost:9".
+	         <DT>Running on a non-Windows platform?
+	             <DD>Make sure vncviewer is on your path.
+		 <DT>Running on a Windows platform?
+		     <DD>Contact a Windows-sympathetic person.
+	     </DL>
+
+ <DT> vncserver starts but there is a problem:
+     <DD> Investigate and correct the problem just as you would if you
+     were on-site and couldn't get vncviewer to run on the machine.
+     For example, if the vncserver is not running, start
+     it.  Contact experts from the shift expert list for your
+     experiment as needed.
+
+ <DT> Don't know a password?
+     <DD> Ask someone who knows.
+</DL>
+
