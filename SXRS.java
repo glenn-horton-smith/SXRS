@@ -112,10 +112,27 @@ public class SXRS extends Applet
 	this.setLayout(new BorderLayout());
 	
 	// icon on west
-	ImageIcon sxrs_icon;
-	sxrs_icon= new ImageIcon
-	    (classLoader.getResource("images/SXRS-icon.gif"),
-	     "Secure eXperiment logo");
+	ImageIcon sxrs_icon= null;
+	String icon_url_string= getSystemProperty("sxrs.iconURL","");
+	if (icon_url_string.length()>0) {
+	    try {
+		URL icon_url= new URL(icon_url_string);
+		sxrs_icon= new ImageIcon( icon_url, icon_url_string );
+	    } catch (Exception e) {
+		JOptionPane.showMessageDialog
+		    ( this,
+		      "This is harmless, but I thought you should know...\n"+
+		      "while trying to open image:\n"+e,
+		      "Icon image load problem",
+		      JOptionPane.ERROR_MESSAGE );
+		sxrs_icon= null;
+	    }
+	}
+	if (sxrs_icon == null) {
+	    sxrs_icon= new ImageIcon
+		(classLoader.getResource("images/SXRS-icon.gif"),
+		 "Secure eXperiment logo");
+	}
 	add(new JLabel(sxrs_icon), BorderLayout.WEST);
 	
 	// input frame on east
