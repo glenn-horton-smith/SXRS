@@ -7,9 +7,11 @@
        Code after the separator line is for actually launching the
        SXRS terminal and vnc viewers.
        
-    @author: Glenn Horton-Smith
-    @date: 2006/05/20
-    @date: 2009/08/13
+    @author Glenn Horton-Smith
+    @version 2006-05-20 original KamLAND Remote Shift tool (KLRS)
+    @version 2009-08-13 extended to Secure eXperiment Remote Shift tool (SXRS)
+    @version 2011-04-25 add option for arbitrary logo
+    @version 2012-06-06 guarantee unique temporary file dire for each session
 */
 
 import java.io.*;
@@ -25,7 +27,7 @@ import java.util.*;
 public class SXRS extends Applet
     implements WindowListener, ActionListener {
 
-    public static final String version="3.000";
+    public static final String version="3.001";
 
     TextField tf_userId;                 // default user ID to use
     JCheckBox ckb_viewonly;              // view only flag for vncviewer
@@ -92,15 +94,37 @@ public class SXRS extends Applet
 	catch (Exception e) {}
 
 	// tmpdir
-	tmpdir= ".";
+	String subdir = "/SXRS_Files-" + UUID.randomUUID();
 	try {
-	    String subdir="/SXRS_Files";
-	    tmpdir= System.getProperty("java.io.tmpdir");
+	    tmpdir = System.getProperty("java.io.tmpdir");
+	}
+	catch (Exception e) {
+	    JOptionPane.showMessageDialog
+		( null, // can't use "this" since we're still in init()
+		  "Problem retrieving tmpdir from java system properties:\n " +
+		  e + "\nWill attempt to use current directory instead.",
+		  "tmpdir problem",
+		  JOptionPane.ERROR_MESSAGE );
+	    tmpdir = ".";  /* Note we must not delete contents of this dir. */
+	}
+	try {
 	    File tf= new File(tmpdir+subdir);
 	    if ( tf.isDirectory() || tf.mkdirs() )
 		tmpdir= tmpdir+subdir;
+	    else {
+		throw new Exception("Path " + tmpdir+subdir +
+				    " is not a directory and can't be made.");
+	    }
 	}
 	catch (Exception e) {	    
+	    JOptionPane.showMessageDialog
+		( null, // can't use "this" yet, still in init()
+		  "Problem opening/creating " + subdir + " in " + tmpdir
+		  + ":\n " +
+		  e + "\nCannot proceed.",
+		  "tmpdir problem",
+		  JOptionPane.ERROR_MESSAGE );
+	    System.exit(1);
 	}
 
 	// class loader
@@ -118,9 +142,10 @@ public class SXRS extends Applet
 	    try {
 		URL icon_url= new URL(icon_url_string);
 		sxrs_icon= new ImageIcon( icon_url, icon_url_string );
+		
 	    } catch (Exception e) {
 		JOptionPane.showMessageDialog
-		    ( this,
+		    ( null, // can't use "this" yet, still in init()
 		      "This is harmless, but I thought you should know...\n"+
 		      "while trying to open image:\n"+e,
 		      "Icon image load problem",
@@ -535,6 +560,18 @@ public class SXRS extends Applet
     // quit method for leaving when window closed
     public void quit()
     {
+	/* clean up temporary directory */
+	clearResourcesCopied();
+	// note the >0 instead of >=0 in next line is deliberate 
+	if (tmpdir.indexOf("/SXRS_Files-")>0) {
+	    try {
+		File tf = new File(tmpdir);
+		tf.delete();
+	    }
+	    catch (Exception e) {
+	    }
+	}		
+	/* exit */
 	System.exit(0);
     }
 
@@ -862,7 +899,7 @@ public class SXRS extends Applet
     void copyFromResource(String resourceJar,
 			  String resourceName,
 			  String destFileName) throws Exception {
-	String resourceId= resourceJar+":"+resourceName+":"+destFileName;
+	String resourceId= resourceJar+"?"+resourceName+"?"+destFileName;
 	if (resourcesCopied.contains(resourceId))
 	    return;
 	InputStream xi;
@@ -907,5 +944,18 @@ public class SXRS extends Applet
 			       +e);
 	}
 
+    } // end copyFromResource
+
+    void clearResourcesCopied() {
+	for (int i=0; i < resourcesCopied.size(); i++) {
+	    try {
+		String rc = resourcesCopied.get(i).toString();
+		int j = rc.lastIndexOf('?');
+		String fn = rc.substring(j+1);
+		File f = new File(fn);
+		f.delete();
+	    } catch (Exception e) {
+	    }
+	}
     }
 }
