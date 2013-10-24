@@ -14,14 +14,15 @@
 <resources>
   <j2se version="1.5+" />
   <jar href="SXRS.jar"/>
-<!-- Uncomment and edit the following "property" lines as needed. -->
-<!--  <property name="sxrs.loginHost" value="ernie.awa.tohoku.ac.jp"/> -->
-<!--  <property name="sxrs.secondLogin" value="shift@telly"/> -->
-<!--  <property name="sxrs.vncserverHostDisplay" value="goose03:2"/> -->
 </resources>
 <resources os="Windows" arch="x86">
   <jar href="SXRS_winexe.jar"/>
 </resources>
+
 <application-desc main-class="SXRS">
+  <argument>sxrs.loginHost=ernie.awa.tohoku.ac.jp</argument> 
+  <argument>sxrs.secondLogin=shift@telly</argument>
+  <argument>sxrs.vncserverHostDisplay=goose03:2</argument> 
 </application-desc>
+
 </jnlp>
