@@ -1,3 +1,5 @@
 Manifest-Version: 1.0
 Main-Class: SXRS
 Class-Path: VncViewer.jar
+Permissions: all-permissions
+Application-Name: Secure eXperiment Remote Shift tool

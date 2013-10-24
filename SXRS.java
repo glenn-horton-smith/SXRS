@@ -11,7 +11,8 @@
     @version 2006-05-20 original KamLAND Remote Shift tool (KLRS)
     @version 2009-08-13 extended to Secure eXperiment Remote Shift tool (SXRS)
     @version 2011-04-25 add option for arbitrary logo
-    @version 2012-06-06 guarantee unique temporary file dire for each session
+    @version 2012-06-06 guarantee unique temporary file dir for each session
+    @version 2013-10-24 use applet params or app args to pass settings
 */
 
 import java.io.*;
@@ -27,7 +28,7 @@ import java.util.*;
 public class SXRS extends Applet
     implements WindowListener, ActionListener {
 
-    public static final String version="3.001";
+    public static final String version="3.010";
 
     TextField tf_userId;                 // default user ID to use
     JCheckBox ckb_viewonly;              // view only flag for vncviewer
@@ -58,6 +59,8 @@ public class SXRS extends Applet
     // the tf_localLoginPortStart text field will go away.
     
     Preferences myprefs;              // preferences database
+    String[] args;                    // arguments from main, if any
+    HashMap argument_pairs;           // name=value pairs from args
     String os;		              // operating system
     String tmpdir;	              // directory for temporary files
     ClassLoader classLoader;          // global class loader to use
@@ -87,6 +90,20 @@ public class SXRS extends Applet
 	    myprefs= Preferences.userRoot().node("SXRS");
 	}
 	catch (Exception e) { myprefs= null; }
+
+	// possible command line arguments from main
+	if (args != null) {
+	    argument_pairs = new HashMap();
+	    for (int i=0; i<args.length; i++) {
+		String[] pair = args[i].split("=", 2);
+		if (pair.length == 2) {
+		    argument_pairs.put( pair[0], pair[1] );
+		}
+		else {
+		    argument_pairs.put( pair[0], null );
+		}
+	    }
+	}
 
 	// os
 	os="unknown";
@@ -137,7 +154,7 @@ public class SXRS extends Applet
 	
 	// icon on west
 	ImageIcon sxrs_icon= null;
-	String icon_url_string= getSystemProperty("sxrs.iconURL","");
+	String icon_url_string= getPrefParam("sxrs.iconURL","");
 	if (icon_url_string.length()>0) {
 	    try {
 		URL icon_url= new URL(icon_url_string);
@@ -186,16 +203,16 @@ public class SXRS extends Applet
 
 	// loginChain
 	tf_loginChain= new TextField
-	    ( getSystemProperty
+	    ( getPrefParam
 	      ( "sxrs.loginChain", "( loginChain not set )" ), 30);
 	pnl_advancedSettings.add( makeInputPanel("Login chain:", tf_loginChain));
 
 	// vncserverHostDisplays
 	cb_vncserverHostDisplays= new JComboBox( );
-	String default_vncservers= getSystemProperty("sxrs.vncserverHostDisplay","");
+	String default_vncservers= getPrefParam("sxrs.vncserverHostDisplay","");
 	cb_vncserverHostDisplays.addItem(default_vncservers);
 	for (int i=1; i<100; i++) {
-	    String alt= getSystemProperty("sxrs.vncserverHostDisplay_"+i,"");
+	    String alt= getPrefParam("sxrs.vncserverHostDisplay_"+i,"");
 	    if (alt.length()<=0)
 		break;
 	    cb_vncserverHostDisplays.addItem( alt );
@@ -206,12 +223,12 @@ public class SXRS extends Applet
 						 cb_vncserverHostDisplays));
 
 	// localVncPort
-	tf_localVncPortStart= new TextField( getSystemProperty("sxrs.localVncPort","5909") );
+	tf_localVncPortStart= new TextField( getPrefParam("sxrs.localVncPort","5909") );
 	pnl_advancedSettings.add( makeInputPanel("Local VNC port:",
 						 tf_localVncPortStart));
 	
 	// localLoginPortStart
-	tf_localLoginPortStart= new TextField( getSystemProperty("sxrs.localLoginPortStart","10022") );
+	tf_localLoginPortStart= new TextField( getPrefParam("sxrs.localLoginPortStart","10022") );
 	pnl_advancedSettings.add( makeInputPanel("Local login port start:",
 						 tf_localLoginPortStart));
 
@@ -221,7 +238,7 @@ public class SXRS extends Applet
 	    default_xtermCommandName= BUNDLED_PUTTY_WINEXE;
 	if ( os.indexOf("Mac")>=0 )
 	    default_xtermCommandName= "/usr/X11R6/bin/xterm -display :0";
-	String xtermCommandName= getSystemProperty("sxrs.xtermCommandName", default_xtermCommandName);
+	String xtermCommandName= getPrefParam("sxrs.xtermCommandName", default_xtermCommandName);
 	cb_xtermCommandName= new JComboBox();
 	cb_xtermCommandName.addItem(xtermCommandName);
 	if ( !xtermCommandName.equals(default_xtermCommandName) )
@@ -237,7 +254,7 @@ public class SXRS extends Applet
 	    default_vncviewerCommandName= BUNDLED_VNCVIEWER_WINEXE;
 	if ( os.indexOf("Mac")>=0 )
 	    default_vncviewerCommandName= BUNDLED_VNCVIEWER_JAVA;
-	String vncviewerCommandName= getSystemProperty("sxrs.vncviewerCommandName", default_vncviewerCommandName);
+	String vncviewerCommandName= getPrefParam("sxrs.vncviewerCommandName", default_vncviewerCommandName);
 	cb_vncviewerCommandName= new JComboBox();
 	cb_vncviewerCommandName.addItem(vncviewerCommandName);
 	if ( !vncviewerCommandName.equals(default_vncviewerCommandName) )
@@ -293,6 +310,23 @@ public class SXRS extends Applet
 	tf_userId.addActionListener(this);
 	b_help.addActionListener(this);
 	b_advancedSettingsToggle.addActionListener(this);
+
+	// succesful init and debug info if requested
+	if ( getPrefParam("sxrs.debug",null) != null ) {
+	    StringBuffer buff = new StringBuffer();
+	    buff.append("Debug info requested by sxrs.debug set.\n");
+	    buff.append("Values from system properties or preferences:\n"+
+			" os="+os+"\n"+
+			" tmpdir="+tmpdir+"\n"+
+			" userID="+userId+"\n" );
+	    buff.append("Argument pairs: " + argument_pairs);
+	    String debugMessage = buff.toString();
+	    JOptionPane.showMessageDialog
+		( null, // can't use "this" yet, still in init()
+		  debugMessage,
+		  "Debug message at end of SXRS.init()",
+		  JOptionPane.INFORMATION_MESSAGE);
+	}
     }
 
     Panel makeInputPanel( String prompt, Component tf )
@@ -459,14 +493,16 @@ public class SXRS extends Applet
     ////////////////////////////////////////////////////////////////
     // utility methods
 
-    String getSystemProperty( String propertyName, String defaultValue )
+    String getPrefParam( String paramName, String defaultValue )
     {
 	String rv=null;
 	try {
 	    if (myprefs != null)
-		try { rv= myprefs.get(propertyName, null); } catch (Exception e) {}
+		try { rv= myprefs.get(paramName, null); } catch (Exception e) {}
+	    if (rv==null && argument_pairs != null)
+		rv= (String)(argument_pairs.get(paramName));
 	    if (rv==null)
-		rv= System.getProperty(propertyName, defaultValue);
+		rv= getParameter(paramName);
 	    if (rv==null)
 		return defaultValue;
 	    else
@@ -592,13 +628,14 @@ public class SXRS extends Applet
 
     ////////////////////////////////////////////////////////////////
     // main() so we can run standalone
-    public static void main(String[] arg)
+    public static void main(String[] args)
     {
 	SXRS sxrs= new SXRS();
 
+	sxrs.args = args;	
 	sxrs.init();
 	
-	Frame f= new Frame("Secure eXperiment Remote Shift Client");
+	Frame f= new Frame("Secure eXperiment Remote Shift Client "+version);
 	f.add(sxrs);
 	f.addWindowListener(sxrs);
 	f.pack();
