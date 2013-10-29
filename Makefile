@@ -7,6 +7,12 @@ SXRS.jar: SXRS.class SXRS_Manifest.MF  images/SXRS-icon.gif html/helpJavaSXRS.ht
 SXRS_winexe.jar: win_exe/*
 	jar cfv SXRS_winexe.jar win_exe/*
 
+VncViewer.jar: tightvnc_javasrc/VncViewer.jar
+	cp tightvnc_javasrc/VncViewer.jar VncViewer.jar
+	jar ufMm  VncViewer.jar VncViewer_MANIFEST.MF
+	jar ufm  VncViewer.jar VncViewer_MANIFEST.MF
+#	jarsigner -verbose -keystore ~/java/sxrsKeys VncViewer.jar sxrs
+
 SXRS.class: SXRS.java
 	javac -source 1.4 -target 1.4 -classpath VncViewer.jar SXRS.java
 
