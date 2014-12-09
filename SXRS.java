@@ -13,6 +13,7 @@
     @version 2011-04-25 add option for arbitrary logo
     @version 2012-06-06 guarantee unique temporary file dir for each session
     @version 2013-10-24 use applet params or app args to pass settings
+    @version 2014-12-09 force gui to run in Swing event dispatch thread
 */
 
 import java.io.*;
@@ -28,7 +29,7 @@ import java.util.*;
 public class SXRS extends Applet
     implements WindowListener, ActionListener {
 
-    public static final String version="3.010";
+    public static final String version="3.011";
 
     TextField tf_userId;                 // default user ID to use
     JCheckBox ckb_viewonly;              // view only flag for vncviewer
@@ -116,7 +117,7 @@ public class SXRS extends Applet
 	    tmpdir = System.getProperty("java.io.tmpdir");
 	}
 	catch (Exception e) {
-	    JOptionPane.showMessageDialog
+	    showMessageDialog
 		( null, // can't use "this" since we're still in init()
 		  "Problem retrieving tmpdir from java system properties:\n " +
 		  e + "\nWill attempt to use current directory instead.",
@@ -134,7 +135,7 @@ public class SXRS extends Applet
 	    }
 	}
 	catch (Exception e) {	    
-	    JOptionPane.showMessageDialog
+	    showMessageDialog
 		( null, // can't use "this" yet, still in init()
 		  "Problem opening/creating " + subdir + " in " + tmpdir
 		  + ":\n " +
@@ -161,7 +162,7 @@ public class SXRS extends Applet
 		sxrs_icon= new ImageIcon( icon_url, icon_url_string );
 		
 	    } catch (Exception e) {
-		JOptionPane.showMessageDialog
+		showMessageDialog
 		    ( null, // can't use "this" yet, still in init()
 		      "This is harmless, but I thought you should know...\n"+
 		      "while trying to open image:\n"+e,
@@ -321,7 +322,7 @@ public class SXRS extends Applet
 			" userID="+userId+"\n" );
 	    buff.append("Argument pairs: " + argument_pairs);
 	    String debugMessage = buff.toString();
-	    JOptionPane.showMessageDialog
+	    showMessageDialog
 		( null, // can't use "this" yet, still in init()
 		  debugMessage,
 		  "Debug message at end of SXRS.init()",
@@ -337,26 +338,29 @@ public class SXRS extends Applet
 	return panel;
     }
 
-    Panel makeRadioButtonPanel( String prompt,
-				ActionListener alistener,
-				JRadioButton [] jarr )
-    {
-	Panel panel= new Panel();
-	panel.add( new Label(prompt) );
-	ButtonGroup group= new ButtonGroup();
-	for (int i=0; i<jarr.length; i++) {
-	    group.add( jarr[i] );
-	    panel.add( jarr[i] );
-	    //	    jarr[i].addActionListener( alistener );
-	}
-	return panel;
+    void showMessageDialog(final Component parentComponent,
+			   final Object message,
+			   final String title,
+			   final int messageType) {
+	// thread-safe call to showMessageDialog, using invokeLater
+	// with an immediate console log message too
+	System.out.println(message);
+	SwingUtilities.invokeLater(new Runnable() {
+	    public void run() {
+		JOptionPane.showMessageDialog(parentComponent,
+					      message,
+					      title,
+					      messageType);
+	      }
+	    });
     }
+			   
 
     void validateUserId() {
      	// get userId and check for validity
      	userId= tf_userId.getText();
      	if (userId.length()<=0 || userId.indexOf(' ')>=0) {
-     	    JOptionPane.showMessageDialog
+     	    showMessageDialog
      		( this,
      		  "User ID must not contain spaces and must not be null.\n"
      		  + "Please enter a valid user ID and try again.",
@@ -479,7 +483,7 @@ public class SXRS extends Applet
 		vncserverDisplays[i]= vncserverDisplay;
 	    }
 	    catch (Exception e) {
-		JOptionPane.showMessageDialog
+		showMessageDialog
 		    ( this,
 		      "Could not parse integer from vncserver Host:Display.\n"
 		      +e,
@@ -523,7 +527,7 @@ public class SXRS extends Applet
 		updateFromLoginChain();
 		updateFromVncserverHostDisplays();
 		if (ih >= n_loginHosts) {
-		    JOptionPane.showMessageDialog
+		    showMessageDialog
 			( this,
 			  "It looks like you changed the login chain string but didn't hit return to update the button bar.\nPlease try again.",
 			  "Oops.",
@@ -540,7 +544,7 @@ public class SXRS extends Applet
 		try {
 		    startViewer(id);
 		} catch (Exception e) {
-		    JOptionPane.showMessageDialog
+		    showMessageDialog
 			( this,
 			  "While trying to start vncviewer:\n"+e,
 			  "Start vncviewer failure",
@@ -582,7 +586,7 @@ public class SXRS extends Applet
 	    p.validate();
 	}
 	else {
-	    JOptionPane.showMessageDialog
+	    showMessageDialog
 		( this,
 		  "Unhandled action: "+evt+"\n"+
 		  "Unimplemented widget, or actionListener was set for a widget that doesn't need it?",
@@ -628,22 +632,28 @@ public class SXRS extends Applet
 
     ////////////////////////////////////////////////////////////////
     // main() so we can run standalone
-    public static void main(String[] args)
+    public static void main(final String[] args)
     {
-	SXRS sxrs= new SXRS();
-
-	sxrs.args = args;	
-	sxrs.init();
-	
-	Frame f= new Frame("Secure eXperiment Remote Shift Client "+version);
-	f.add(sxrs);
-	f.addWindowListener(sxrs);
-	f.pack();
-	f.setVisible(true);
-
-	sxrs.start();
+	// Since some javax.swing classes are used in the SXRS gui,
+	// and by design swing is not thread-safe,
+	// we launch using SwingUtilities.invokeLater().
+	SwingUtilities.invokeLater(new Runnable() {
+	    public void run() {
+		SXRS sxrs= new SXRS();
+	  
+		sxrs.args = args;	
+		sxrs.init();
+		
+		Frame f= new Frame("Secure eXperiment Remote Shift Client "+version);
+		f.add(sxrs);
+		f.addWindowListener(sxrs);
+		f.pack();
+		f.setVisible(true);
+		
+		sxrs.start();
+	      }
+	    });
     }
-
 
 // *+*+*+*+*+*+*+*+*+*+*+*+*+*+*+*+*+*+*+*+*+*+*+*+*+*+*+*+*+*+*+*+*+*+*+*+*
 // *+*  End of GUI code                                                  *+*
@@ -667,7 +677,7 @@ public class SXRS extends Applet
 	    runTerminal();
 	}
 	catch (Exception e) {
-	    JOptionPane.showMessageDialog
+	    showMessageDialog
 		( appf,
 		  "While trying to start terminal:\n"+e,
 		  "Start terminal failure",
@@ -689,7 +699,7 @@ public class SXRS extends Applet
      	    nextLoginPort= Integer.decode(tf_localLoginPortStart.getText()).intValue() + istage;
      	}
      	catch (Exception e) {
-     	    JOptionPane.showMessageDialog
+     	    showMessageDialog
      		( appf,
      		  "Could not parse integer from \"local login port\" advanced setting.\n"
      		  + "Please enter an integer and try again.",
@@ -705,7 +715,7 @@ public class SXRS extends Applet
      	    localVncPortStart= Integer.decode(tf_localVncPortStart.getText()).intValue();
      	}
      	catch (Exception e) {
-     	    JOptionPane.showMessageDialog
+     	    showMessageDialog
      		( appf,
      		  "Could not parse integer from \"local VNC port\" advanced setting.\n"
      		  + "Please enter an integer and try again.",
@@ -787,7 +797,7 @@ public class SXRS extends Applet
      	    StringBuffer cmdstring= new StringBuffer();
      	    for (int i=0; i<command.length; i++)
      		cmdstring.append(command[i]+" ");
-     	    JOptionPane.showMessageDialog
+     	    showMessageDialog
      		( appf,
      		  "Execution of command failed! Command was\n"
      		  +cmdstring + "\nException: "+e+ "\nOs: "+os+
@@ -838,7 +848,7 @@ public class SXRS extends Applet
      	    StringBuffer cmdstring= new StringBuffer();
      	    for (int i=0; i<command.length; i++)
      		cmdstring.append(command[i]+" ");
-     	    JOptionPane.showMessageDialog
+     	    showMessageDialog
      		( appf,
      		  "Process ended with code "+exitValue
      		  + "\nCommand was\n"
@@ -872,7 +882,7 @@ public class SXRS extends Applet
 		+ "Please start your vncviewer using localhost for the host and 9 for the display.";
 	    if ( ckb_viewonly.isSelected() )
 		message = message + "\nNote: you will also have to select ViewOnly mode manually.";
-	    JOptionPane.showMessageDialog
+	    showMessageDialog
 		( this,
 		  message,
 		  "Please start your VNCviewer now.",
@@ -913,7 +923,7 @@ public class SXRS extends Applet
 	    p.getOutputStream().close();  // this closes stdin of the process
 	    // (note "getOutputStream" gives the process's standard *input*)
 	} catch (Exception e) {
-	    JOptionPane.showMessageDialog
+	    showMessageDialog
 		( this,
 		  "Execution of command failed! Command was\n"
 		  +command + "\nException: "+e+ "\nOs: "+os,
